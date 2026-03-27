@@ -1,40 +1,44 @@
-import { ChartJSNodeCanvas } from 'chartjs-node-canvas';
-import type { VercelRequest, VercelResponse } from '@vercel/node';
-
-const canvas = new ChartJSNodeCanvas({
-  width: 800,
-  height: 400,
-  backgroundColour: 'white'
-});
+import * as echarts from 'echarts';
+import { VercelRequest, VercelResponse } from '@vercel/node';
 
 export default async function handler(
   req: VercelRequest,
   res: VercelResponse
 ) {
-  const labels = (req.query.labels as string || 'A,B,C').split(',');
-  const values = (req.query.values as string || '5,10,7')
+  const labels = ((req.query.labels as string) || 'A,B,C').split(',');
+  const values = ((req.query.values as string) || '5,10,7')
     .split(',')
     .map(Number);
 
-  const config = {
-    type: 'bar',
-    data: {
-      labels,
-      datasets: [
-        {
-          label: 'Data',
-          data: values
-        }
-      ]
+  const chart = echarts.init(null, undefined, {
+    renderer: 'svg',
+    ssr: true,
+    width: 800,
+    height: 400
+  });
+
+  chart.setOption({
+    animation: false,
+    xAxis: {
+      type: 'category',
+      data: labels
     },
-    options: {
-      animation: false,
-      responsive: false
-    }
-  };
+    yAxis: {
+      type: 'value'
+    },
+    series: [
+      {
+        name: 'Data',
+        type: 'bar',
+        data: values
+      }
+    ]
+  });
 
-  const image = await canvas.renderToBuffer(config as any);
+  const svg = chart.renderToSVGString();
 
-  res.setHeader('Content-Type', 'image/png');
-  res.end(image);
+  chart.dispose();
+
+  res.setHeader('Content-Type', 'image/svg+xml');
+  res.end(svg);
 }

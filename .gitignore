@@ -32,3 +32,4 @@ Thumbs.db
 
 # coverage (if you add tests later)
 coverage/
+.vercel
