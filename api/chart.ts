@@ -1,44 +1,404 @@
-import * as echarts from 'echarts';
-import { VercelRequest, VercelResponse } from '@vercel/node';
+import type { VercelRequest, VercelResponse } from '@vercel/node';
+
+type GraphQLResponse = {
+  data?: {
+    user?: {
+      repositories: {
+        nodes: Array<{
+          name: string;
+          isFork: boolean;
+          createdAt: string;
+          languages: {
+            edges: Array<{
+              size: number;
+              node: {
+                name: string;
+              };
+            }>;
+          };
+        }>;
+      };
+    };
+    rateLimit?: {
+      cost: number;
+      remaining: number;
+      resetAt: string;
+    };
+  };
+  errors?: Array<{ message: string }>;
+};
+
+type Point = {
+  x: number;
+  y: number;
+  repoIndex: number;
+  value: number;
+};
+
+type Series = {
+  name: string;
+  color: string;
+  points: Point[];
+  finalValue: number;
+  path: string;
+  pathLength: number;
+};
+
+const COLORS = [
+  '#58a6ff',
+  '#3fb950',
+  '#f2cc60',
+  '#ff7b72',
+  '#bc8cff',
+  '#ffa657',
+  '#79c0ff',
+  '#a5d6ff',
+  '#7ee787',
+  '#d2a8ff',
+  '#e3b341',
+  '#ffab70'
+];
+
+function escapeXml(value: string) {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
+function formatBytes(value: number) {
+  if (value >= 1_000_000_000) return `${(value / 1_000_000_000).toFixed(1)}B`;
+  if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M`;
+  if (value >= 1_000) return `${(value / 1_000).toFixed(1)}K`;
+  return String(Math.round(value));
+}
+
+function getPathLength(points: Point[]) {
+  let total = 0;
+
+  for (let i = 1; i < points.length; i++) {
+    const dx = points[i].x - points[i - 1].x;
+    const dy = points[i].y - points[i - 1].y;
+    total += Math.sqrt(dx * dx + dy * dy);
+  }
+
+  return Math.max(1, total);
+}
 
 export default async function handler(
   req: VercelRequest,
   res: VercelResponse
 ) {
-  const labels = ((req.query.labels as string) || 'A,B,C').split(',');
-  const values = ((req.query.values as string) || '5,10,7')
-    .split(',')
-    .map(Number);
+  try {
+    const username = String(req.query.username || 'joaodemutti');
+    const includeForks = String(req.query.forks || 'false') === 'true';
+    const top = Math.max(1, Math.min(12, Number(req.query.top || 8)));
+    const width = Math.max(700, Number(req.query.width || 1100));
+    const height = Math.max(420, Number(req.query.height || 620));
 
-  const chart = echarts.init(null, undefined, {
-    renderer: 'svg',
-    ssr: true,
-    width: 800,
-    height: 400
-  });
+    const token = process.env.GITHUB_TOKEN;
 
-  chart.setOption({
-    animation: false,
-    xAxis: {
-      type: 'category',
-      data: labels
-    },
-    yAxis: {
-      type: 'value'
-    },
-    series: [
-      {
-        name: 'Data',
-        type: 'bar',
-        data: values
+    if (!token) {
+      res.status(500).json({
+        error: 'Missing GITHUB_TOKEN environment variable'
+      });
+      return;
+    }
+
+    const query = `
+      query UserLanguages($login: String!) {
+        user(login: $login) {
+          repositories(
+            first: 100
+            ownerAffiliations: OWNER
+            orderBy: { field: CREATED_AT, direction: ASC }
+            isFork: null
+            privacy: PUBLIC
+          ) {
+            nodes {
+              name
+              isFork
+              createdAt
+              languages(first: 20, orderBy: { field: SIZE, direction: DESC }) {
+                edges {
+                  size
+                  node {
+                    name
+                  }
+                }
+              }
+            }
+          }
+        }
+        rateLimit {
+          cost
+          remaining
+          resetAt
+        }
       }
-    ]
-  });
+    `;
 
-  const svg = chart.renderToSVGString();
+    const ghRes = await fetch('https://api.github.com/graphql', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+        'User-Agent': 'github-language-chart'
+      },
+      body: JSON.stringify({
+        query,
+        variables: {
+          login: username
+        }
+      })
+    });
 
-  chart.dispose();
+    const payload = (await ghRes.json()) as GraphQLResponse;
 
-  res.setHeader('Content-Type', 'image/svg+xml');
-  res.end(svg);
+    if (!ghRes.ok || payload.errors) {
+      res.status(ghRes.status || 500).json({
+        error: 'GraphQL request failed',
+        details: payload.errors?.map((e) => e.message).join('; ') || payload
+      });
+      return;
+    }
+
+    const repos = payload.data?.user?.repositories.nodes ?? [];
+    const filteredRepos = includeForks ? repos : repos.filter((r) => !r.isFork);
+
+    if (filteredRepos.length === 0) {
+      res.status(404).send('No repositories found');
+      return;
+    }
+
+    const allLanguages = new Set<string>();
+
+    for (const repo of filteredRepos) {
+      for (const edge of repo.languages.edges) {
+        allLanguages.add(edge.node.name);
+      }
+    }
+
+    if (allLanguages.size === 0) {
+      res.status(404).send('No language data found');
+      return;
+    }
+
+    const cumulative = new Map<string, number>();
+    const rawData: Array<{
+      RepoIndex: number;
+      RepoName: string;
+      Language: string;
+      Bytes: number;
+    }> = [];
+
+    filteredRepos.forEach((repo, index) => {
+      const repoLangMap = new Map<string, number>();
+
+      for (const edge of repo.languages.edges) {
+        repoLangMap.set(edge.node.name, edge.size);
+      }
+
+      for (const language of allLanguages) {
+        const current = cumulative.get(language) || 0;
+        const added = repoLangMap.get(language) || 0;
+        const next = current + added;
+
+        cumulative.set(language, next);
+
+        rawData.push({
+          RepoIndex: index + 1,
+          RepoName: repo.name,
+          Language: language,
+          Bytes: next
+        });
+      }
+    });
+
+    const finalTotals = new Map<string, number>();
+    for (const row of rawData) {
+      finalTotals.set(row.Language, row.Bytes);
+    }
+
+    const selectedLanguages = [...allLanguages]
+      .filter((language) => (finalTotals.get(language) || 0) > 0)
+      .sort((a, b) => (finalTotals.get(b) || 0) - (finalTotals.get(a) || 0))
+      .slice(0, top);
+
+    const padding = {
+      top: 72,
+      right: 220,
+      bottom: 56,
+      left: 72
+    };
+
+    const chartWidth = width - padding.left - padding.right;
+    const chartHeight = height - padding.top - padding.bottom;
+    const maxX = Math.max(1, filteredRepos.length);
+    const maxY = Math.max(
+      1,
+      ...selectedLanguages.map((lang) => finalTotals.get(lang) || 0)
+    );
+
+    const scaleX = (repoIndex: number) => {
+      if (maxX <= 1) return padding.left;
+      return padding.left + ((repoIndex - 1) / (maxX - 1)) * chartWidth;
+    };
+
+    const scaleY = (value: number) => {
+      return padding.top + chartHeight - (value / maxY) * chartHeight;
+    };
+
+    const series: Series[] = selectedLanguages.map((lang, index) => {
+      const rows = rawData.filter((r) => r.Language === lang);
+
+      const points = rows.map((r) => ({
+        x: scaleX(r.RepoIndex),
+        y: scaleY(r.Bytes),
+        repoIndex: r.RepoIndex,
+        value: r.Bytes
+      }));
+
+      const path = points
+        .map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x.toFixed(2)} ${p.y.toFixed(2)}`)
+        .join(' ');
+
+      return {
+        name: lang,
+        color: COLORS[index % COLORS.length],
+        points,
+        finalValue: finalTotals.get(lang) || 0,
+        path,
+        pathLength: getPathLength(points)
+      };
+    });
+
+    const yTickCount = 5;
+    const yTicks = Array.from({ length: yTickCount + 1 }, (_, i) => {
+      const value = (maxY / yTickCount) * i;
+      return {
+        value,
+        y: scaleY(value)
+      };
+    });
+
+    const xLabelEvery = Math.max(1, Math.ceil(maxX / 8));
+    const xTicks = Array.from({ length: maxX }, (_, i) => i + 1).filter(
+      (value) => value === 1 || value === maxX || value % xLabelEvery === 0
+    );
+
+    const totalDur = 8;
+
+    const svg = `
+<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" role="img" aria-label="${escapeXml(username)} GitHub languages line race">
+  <defs>
+    <style>
+      text {
+        font-family: Arial, Helvetica, sans-serif;
+      }
+      .bg {
+        fill: #ffffff;
+      }
+      .title {
+        font-size: 24px;
+        font-weight: 700;
+        fill: #24292f;
+      }
+      .subtitle {
+        font-size: 12px;
+        fill: #57606a;
+      }
+      .axis-line {
+        stroke: #d0d7de;
+        stroke-width: 1;
+      }
+      .grid-line {
+        stroke: #d8dee4;
+        stroke-width: 1;
+        stroke-dasharray: 3 4;
+      }
+      .axis-label {
+        font-size: 11px;
+        fill: #57606a;
+      }
+      .line {
+        fill: none;
+        stroke-width: 3;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+      }
+      .end-label {
+        font-size: 12px;
+        font-weight: 600;
+      }
+    </style>
+  </defs>
+
+  <rect class="bg" x="0" y="0" width="${width}" height="${height}" rx="0" />
+
+  <text x="${padding.left}" y="34" class="title">${escapeXml(username)} · GitHub Languages</text>
+  <text x="${padding.left}" y="54" class="subtitle">Cumulative bytes by repository creation order</text>
+
+  ${yTicks.map((tick) => `
+    <line x1="${padding.left}" y1="${tick.y}" x2="${padding.left + chartWidth}" y2="${tick.y}" class="grid-line" />
+    <text x="${padding.left - 10}" y="${tick.y + 4}" text-anchor="end" class="axis-label">${formatBytes(tick.value)}</text>
+  `).join('')}
+
+  <line x1="${padding.left}" y1="${padding.top}" x2="${padding.left}" y2="${padding.top + chartHeight}" class="axis-line" />
+  <line x1="${padding.left}" y1="${padding.top + chartHeight}" x2="${padding.left + chartWidth}" y2="${padding.top + chartHeight}" class="axis-line" />
+
+  ${xTicks.map((tick) => `
+    <text x="${scaleX(tick)}" y="${padding.top + chartHeight + 22}" text-anchor="middle" class="axis-label">${tick}</text>
+  `).join('')}
+
+  <text x="${padding.left + chartWidth / 2}" y="${height - 12}" text-anchor="middle" class="axis-label">Repository order</text>
+  <text x="20" y="${padding.top + chartHeight / 2}" transform="rotate(-90 20 ${padding.top + chartHeight / 2})" text-anchor="middle" class="axis-label">Cumulative bytes</text>
+
+  ${series.map((s, index) => {
+    const finalPoint = s.points[s.points.length - 1];
+    const begin = `${(index * 0.18).toFixed(2)}s`;
+    const dur = `${Math.max(3.2, totalDur - index * 0.18).toFixed(2)}s`;
+
+    return `
+      <path
+        d="${s.path}"
+        class="line"
+        stroke="${s.color}"
+        stroke-dasharray="${s.pathLength}"
+        stroke-dashoffset="${s.pathLength}"
+      >
+        <animate
+          attributeName="stroke-dashoffset"
+          from="${s.pathLength}"
+          to="0"
+          begin="${begin}"
+          dur="${dur}"
+          fill="freeze"
+        />
+      </path>
+
+      <circle cx="${s.points[0].x}" cy="${s.points[0].y}" r="4" fill="${s.color}" opacity="0">
+        <animate attributeName="opacity" from="0" to="1" begin="${begin}" dur="0.15s" fill="freeze" />
+        <animateMotion begin="${begin}" dur="${dur}" fill="freeze" path="${s.path}" />
+      </circle>
+
+      <g opacity="0">
+        <animate attributeName="opacity" from="0" to="1" begin="${(index * 0.18 + 0.9).toFixed(2)}s" dur="0.35s" fill="freeze" />
+        <text x="${finalPoint.x + 10}" y="${finalPoint.y + 4}" class="end-label" fill="${s.color}">
+          ${escapeXml(s.name)}: ${formatBytes(s.finalValue)}
+        </text>
+      </g>
+    `;
+  }).join('')}
+</svg>`.trim();
+
+    res.setHeader('Content-Type', 'image/svg+xml; charset=utf-8');
+    res.setHeader('Cache-Control', 's-maxage=86400, stale-while-revalidate=86400');
+    res.status(200).send(svg);
+  } catch (error) {
+    res.status(500).json({
+      error: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
 }
