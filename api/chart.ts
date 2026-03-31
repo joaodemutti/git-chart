@@ -375,6 +375,7 @@ export default async function handler(
 
   ${series.map((s, index) => {
     const finalPoint = s.points[s.points.length - 1];
+    const finalLabelOffsetY = 16 * index;
     const beginSeconds = index * 0.18;
     const durSeconds = Math.max(3.2, totalDur - index * 0.18);
     const endSeconds = beginSeconds + durSeconds;
@@ -413,7 +414,7 @@ export default async function handler(
 
       <g opacity="0">
         <animate attributeName="opacity" from="0" to="1" begin="${end}" dur="0.35s" fill="freeze" />
-        <text x="${finalPoint.x + 22}" y="${finalPoint.y + 8}" class="end-label" fill="${s.color}">
+        <text x="${finalPoint.x + 10}" y="${finalPoint.y + 4 + finalLabelOffsetY}" class="end-label" fill="${s.color}">
           ${formatBytes(s.finalValue)}${showPercent ? ` (${formatPercent((s.finalValue / grandTotal) * 100)})` : ''}
         </text>
       </g>
