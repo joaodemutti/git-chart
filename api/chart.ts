@@ -452,6 +452,11 @@ export default async function handler(
   <line x1="${padding.left}" y1="${padding.top}" x2="${padding.left}" y2="${padding.top + chartHeight}" class="axis-line" />
   <line x1="${padding.left}" y1="${padding.top + chartHeight}" x2="${padding.left + chartWidth}" y2="${padding.top + chartHeight}" class="axis-line" />
 
+  <line x1="${raceStartX}" y1="${padding.top}" x2="${raceStartX}" y2="${padding.top + chartHeight}" stroke="#8c959f" stroke-width="1" stroke-dasharray="4 6" opacity="0.45">
+    <animate attributeName="x1" from="${raceStartX}" to="${raceEndX}" begin="${animationDelay}s" dur="${(overallEndSeconds - animationDelay).toFixed(2)}s" fill="freeze" />
+    <animate attributeName="x2" from="${raceStartX}" to="${raceEndX}" begin="${animationDelay}s" dur="${(overallEndSeconds - animationDelay).toFixed(2)}s" fill="freeze" />
+  </line>
+
   ${xTicks.map((tick) => `
     <text x="${scaleX(tick)}" y="${padding.top + chartHeight + 22}" text-anchor="middle" class="axis-label">${formatDateLabel(repoDates[tick - 1], dateRange)}</text>
   `).join('')}
