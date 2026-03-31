@@ -362,37 +362,14 @@ export default async function handler(
       };
     });
 
-    const minLabelSpacing = 70;
-    const xTicks: number[] = [];
-    let lastLabelX = -Infinity;
-    for (let i = 1; i <= maxX; i++) {
-      const x = scaleX(i);
-      const isEdge = i === 1 || i === maxX;
-      if (isEdge || x - lastLabelX >= minLabelSpacing) {
-        xTicks.push(i);
-        lastLabelX = x;
-      }
-    }
-    if (!xTicks.includes(maxX)) {
-      xTicks.push(maxX);
-    }
-    if (xTicks.length >= 2) {
-      const last = xTicks[xTicks.length - 1];
-      const prev = xTicks[xTicks.length - 2];
-      if (scaleX(last) - scaleX(prev) < minLabelSpacing) {
-        xTicks.splice(xTicks.length - 2, 1);
-      }
-    }
+    const xTickCount = Math.min(8, maxX);
+    const xTicks = Array.from({ length: xTickCount }, (_, i) => {
+      if (xTickCount === 1) return 1;
+      return Math.round(1 + (i * (maxX - 1)) / (xTickCount - 1));
+    });
 
     const totalDur = 8;
-    const lastIndex = Math.max(0, series.length - 1);
     const animationDelay = 0.5;
-    const overallEndSeconds =
-      animationDelay +
-      lastIndex * 0.18 +
-      Math.max(3.2, totalDur - lastIndex * 0.18);
-    const raceStartX = scaleX(1);
-    const raceEndX = scaleX(maxX);
 
     const svg = `
 <svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" role="img" aria-label="${escapeXml(username)} GitHub languages line race">
@@ -451,11 +428,6 @@ export default async function handler(
 
   <line x1="${padding.left}" y1="${padding.top}" x2="${padding.left}" y2="${padding.top + chartHeight}" class="axis-line" />
   <line x1="${padding.left}" y1="${padding.top + chartHeight}" x2="${padding.left + chartWidth}" y2="${padding.top + chartHeight}" class="axis-line" />
-
-  <line x1="${raceStartX}" y1="${padding.top}" x2="${raceStartX}" y2="${padding.top + chartHeight}" stroke="#8c959f" stroke-width="1" stroke-dasharray="4 6" opacity="0.45">
-    <animate attributeName="x1" from="${raceStartX}" to="${raceEndX}" begin="${animationDelay}s" dur="${(overallEndSeconds - animationDelay).toFixed(2)}s" fill="freeze" />
-    <animate attributeName="x2" from="${raceStartX}" to="${raceEndX}" begin="${animationDelay}s" dur="${(overallEndSeconds - animationDelay).toFixed(2)}s" fill="freeze" />
-  </line>
 
   ${xTicks.map((tick) => `
     <text x="${scaleX(tick)}" y="${padding.top + chartHeight + 22}" text-anchor="middle" class="axis-label">${formatDateLabel(repoDates[tick - 1], dateRange)}</text>
