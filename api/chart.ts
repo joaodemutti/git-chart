@@ -413,7 +413,7 @@ export default async function handler(
 
       <g opacity="0">
         <animate attributeName="opacity" from="0" to="1" begin="${end}" dur="0.35s" fill="freeze" />
-        <text x="${finalPoint.x + 10}" y="${finalPoint.y + 4}" class="end-label" fill="${s.color}">
+        <text x="${finalPoint.x + 22}" y="${finalPoint.y + 8}" class="end-label" fill="${s.color}">
           ${formatBytes(s.finalValue)}${showPercent ? ` (${formatPercent((s.finalValue / grandTotal) * 100)})` : ''}
         </text>
       </g>
