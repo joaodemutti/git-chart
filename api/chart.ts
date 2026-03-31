@@ -42,6 +42,9 @@ type Series = {
   finalValue: number;
   path: string;
   pathLength: number;
+  keyTimes: string;
+  keyPoints: string;
+  dashValues: string;
 };
 
 const COLORS = [
@@ -100,6 +103,38 @@ function getPathLength(points: Point[]) {
   }
 
   return Math.max(1, total);
+}
+
+function getPathKeyframes(points: Point[]) {
+  const lengths: number[] = [0];
+  let total = 0;
+
+  for (let i = 1; i < points.length; i++) {
+    const dx = points[i].x - points[i - 1].x;
+    const dy = points[i].y - points[i - 1].y;
+    total += Math.sqrt(dx * dx + dy * dy);
+    lengths.push(total);
+  }
+
+  total = Math.max(1, total);
+  const denom = Math.max(1, points.length - 1);
+
+  const keyTimes = lengths
+    .map((_, i) => (i / denom).toFixed(4))
+    .join(';');
+  const keyPoints = lengths
+    .map((length) => (length / total).toFixed(4))
+    .join(';');
+  const dashValues = lengths
+    .map((length) => (total - length).toFixed(2))
+    .join(';');
+
+  return {
+    total,
+    keyTimes,
+    keyPoints,
+    dashValues
+  };
 }
 
 export default async function handler(
@@ -304,6 +339,7 @@ export default async function handler(
       const path = points
         .map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x.toFixed(2)} ${p.y.toFixed(2)}`)
         .join(' ');
+      const keyframes = getPathKeyframes(points);
 
       return {
         name: lang,
@@ -311,7 +347,10 @@ export default async function handler(
         points,
         finalValue: finalTotals.get(lang) || 0,
         path,
-        pathLength: getPathLength(points)
+        pathLength: keyframes.total,
+        keyTimes: keyframes.keyTimes,
+        keyPoints: keyframes.keyPoints,
+        dashValues: keyframes.dashValues
       };
     });
 
@@ -437,10 +476,10 @@ export default async function handler(
   <text x="20" y="${padding.top + chartHeight / 2}" transform="rotate(-90 20 ${padding.top + chartHeight / 2})" text-anchor="middle" class="axis-label">Cumulative bytes${showPercent ? ' (%)' : ''}</text>
 
   ${series.map((s, index) => {
-      const finalPoint = s.points[s.points.length - 1];
-      const beginSeconds = animationDelay + index * 0.18;
-      const durSeconds = Math.max(3.2, totalDur - index * 0.18);
-      const endSeconds = beginSeconds + durSeconds;
+    const finalPoint = s.points[s.points.length - 1];
+    const beginSeconds = animationDelay;
+    const durSeconds = totalDur;
+    const endSeconds = beginSeconds + durSeconds;
       const begin = `${beginSeconds.toFixed(2)}s`;
       const dur = `${durSeconds.toFixed(2)}s`;
       const end = `${endSeconds.toFixed(2)}s`;
@@ -456,24 +495,25 @@ export default async function handler(
       >
         <animate
           attributeName="stroke-dashoffset"
-          from="${s.pathLength}"
-          to="0"
+          values="${s.dashValues}"
+          keyTimes="${s.keyTimes}"
           begin="${begin}"
           dur="${dur}"
+          calcMode="linear"
           fill="freeze"
         />
       </path>
 
       <circle cx="${s.points[0].x}" cy="${s.points[0].y}" r="4" fill="${s.color}" opacity="0">
         <animate attributeName="opacity" from="0" to="1" begin="${begin}" dur="0.15s" fill="freeze" />
-        <animateMotion begin="${begin}" dur="${dur}" fill="freeze" path="${s.path}" />
+        <animateMotion begin="${begin}" dur="${dur}" fill="freeze" path="${s.path}" keyTimes="${s.keyTimes}" keyPoints="${s.keyPoints}" calcMode="linear" />
       </circle>
 
       <text fill="${s.color}" font-size="12" font-weight="600" opacity="0">
         ${escapeXml(s.name)}
         <animate attributeName="opacity" from="0" to="1" begin="${begin}" dur="0.25s" fill="freeze" />
         <animate attributeName="opacity" from="1" to="0" begin="${end}" dur="0.01s" fill="freeze" />
-        <animateMotion begin="${begin}" dur="${dur}" fill="freeze" path="${s.path}" />
+        <animateMotion begin="${begin}" dur="${dur}" fill="freeze" path="${s.path}" keyTimes="${s.keyTimes}" keyPoints="${s.keyPoints}" calcMode="linear" />
       </text>
 
       <g opacity="0">
