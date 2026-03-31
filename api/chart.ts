@@ -286,6 +286,44 @@ export default async function handler(
       };
     });
 
+    const labelPaddingTop = padding.top + 6;
+    const labelPaddingBottom = padding.top + chartHeight - 6;
+    const minLabelGap = 16;
+    const labelX = padding.left + chartWidth + 16;
+
+    const labelLayout = series
+      .map((s, index) => {
+        const finalPoint = s.points[s.points.length - 1];
+        return {
+          index,
+          desiredY: finalPoint.y + 4
+        };
+      })
+      .sort((a, b) => a.desiredY - b.desiredY);
+
+    let cursorY = labelPaddingTop;
+    const labelPositions: number[] = new Array(series.length);
+    for (const item of labelLayout) {
+      const clamped = Math.max(labelPaddingTop, Math.min(labelPaddingBottom, item.desiredY));
+      const y = Math.max(clamped, cursorY);
+      labelPositions[item.index] = y;
+      cursorY = y + minLabelGap;
+    }
+
+    for (let i = labelLayout.length - 1; i >= 0; i--) {
+      const index = labelLayout[i].index;
+      const nextIndex = labelLayout[i + 1]?.index;
+      const maxY = Math.min(labelPaddingBottom, labelPositions[index] ?? labelPaddingBottom);
+      if (nextIndex !== undefined) {
+        labelPositions[index] = Math.min(
+          maxY,
+          (labelPositions[nextIndex] ?? maxY) - minLabelGap
+        );
+      } else {
+        labelPositions[index] = Math.min(maxY, labelPaddingBottom);
+      }
+    }
+
     const yTickCount = 5;
     const yTicks = Array.from({ length: yTickCount + 1 }, (_, i) => {
       const value = (maxY / yTickCount) * i;
