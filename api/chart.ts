@@ -362,10 +362,20 @@ export default async function handler(
       };
     });
 
-    const xLabelEvery = Math.max(1, Math.ceil(maxX / 8));
-    const xTicks = Array.from({ length: maxX }, (_, i) => i + 1).filter(
-      (value) => value === 1 || value === maxX || value % xLabelEvery === 0
-    );
+    const minLabelSpacing = 70;
+    const xTicks: number[] = [];
+    let lastLabelX = -Infinity;
+    for (let i = 1; i <= maxX; i++) {
+      const x = scaleX(i);
+      const isEdge = i === 1 || i === maxX;
+      if (isEdge || x - lastLabelX >= minLabelSpacing) {
+        xTicks.push(i);
+        lastLabelX = x;
+      }
+    }
+    if (!xTicks.includes(maxX)) {
+      xTicks.push(maxX);
+    }
 
     const totalDur = 8;
 
