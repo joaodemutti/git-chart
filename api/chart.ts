@@ -386,13 +386,13 @@ export default async function handler(
 
     const totalDur = 8;
     const lastIndex = Math.max(0, series.length - 1);
+    const animationDelay = 0.5;
     const overallEndSeconds =
       animationDelay +
       lastIndex * 0.18 +
       Math.max(3.2, totalDur - lastIndex * 0.18);
     const raceStartX = scaleX(1);
     const raceEndX = scaleX(maxX);
-    const animationDelay = 0.5;
 
     const svg = `
 <svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" role="img" aria-label="${escapeXml(username)} GitHub languages line race">
@@ -465,16 +465,16 @@ export default async function handler(
   <text x="20" y="${padding.top + chartHeight / 2}" transform="rotate(-90 20 ${padding.top + chartHeight / 2})" text-anchor="middle" class="axis-label">Cumulative bytes${showPercent ? ' (%)' : ''}</text>
 
   ${series.map((s, index) => {
-    const finalPoint = s.points[s.points.length - 1];
-    const beginSeconds = animationDelay + index * 0.18;
-    const durSeconds = Math.max(3.2, totalDur - index * 0.18);
-    const endSeconds = beginSeconds + durSeconds;
-    const begin = `${beginSeconds.toFixed(2)}s`;
-    const dur = `${durSeconds.toFixed(2)}s`;
-    const end = `${endSeconds.toFixed(2)}s`;
-    const labelY = labelPositions[index] ?? finalPoint.y + 4;
+      const finalPoint = s.points[s.points.length - 1];
+      const beginSeconds = animationDelay + index * 0.18;
+      const durSeconds = Math.max(3.2, totalDur - index * 0.18);
+      const endSeconds = beginSeconds + durSeconds;
+      const begin = `${beginSeconds.toFixed(2)}s`;
+      const dur = `${durSeconds.toFixed(2)}s`;
+      const end = `${endSeconds.toFixed(2)}s`;
+      const labelY = labelPositions[index] ?? finalPoint.y + 4;
 
-    return `
+      return `
       <path
         d="${s.path}"
         class="line"
@@ -512,7 +512,7 @@ export default async function handler(
         </text>
       </g>
     `;
-  }).join('')}
+    }).join('')}
 </svg>`.trim();
 
     res.setHeader('Content-Type', 'image/svg+xml; charset=utf-8');
