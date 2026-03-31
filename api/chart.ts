@@ -283,9 +283,9 @@ export default async function handler(
       maxY = (grandTotal * roundedPercent) / 100;
     }
 
-    const scaleX = (repoDate: number) => {
-      if (minDate === maxDate) return padding.left;
-      return padding.left + ((repoDate - minDate) / dateRange) * chartWidth;
+    const scaleX = (repoIndex: number) => {
+      if (maxX <= 1) return padding.left;
+      return padding.left + ((repoIndex - 1) / (maxX - 1)) * chartWidth;
     };
 
     const scaleY = (value: number) => {
@@ -296,7 +296,7 @@ export default async function handler(
       const rows = rawData.filter((r) => r.Language === lang);
 
       const points = rows.map((r) => ({
-        x: scaleX(r.RepoDate),
+        x: scaleX(r.RepoIndex),
         y: scaleY(r.Bytes),
         repoIndex: r.RepoIndex,
         value: r.Bytes
@@ -363,11 +363,10 @@ export default async function handler(
       };
     });
 
-    const dayMs = 1000 * 60 * 60 * 24;
-    const xTicks: number[] = [];
-    for (let t = minDate; t <= maxDate; t += dayMs) {
-      xTicks.push(t);
-    }
+    const xLabelEvery = Math.max(1, Math.ceil(maxX / 8));
+    const xTicks = Array.from({ length: maxX }, (_, i) => i + 1).filter(
+      (value) => value === 1 || value === maxX || value % xLabelEvery === 0
+    );
 
     const totalDur = 8;
 
@@ -430,10 +429,10 @@ export default async function handler(
   <line x1="${padding.left}" y1="${padding.top + chartHeight}" x2="${padding.left + chartWidth}" y2="${padding.top + chartHeight}" class="axis-line" />
 
   ${xTicks.map((tick) => `
-    <text x="${scaleX(tick)}" y="${padding.top + chartHeight + 22}" text-anchor="middle" class="axis-label">${formatDateLabel(tick, dateRange)}</text>
+    <text x="${scaleX(tick)}" y="${padding.top + chartHeight + 22}" text-anchor="middle" class="axis-label">${formatDateLabel(repoDates[tick - 1], dateRange)}</text>
   `).join('')}
 
-  <text x="${padding.left + chartWidth / 2}" y="${height - 12}" text-anchor="middle" class="axis-label">Repository date</text>
+  <text x="${padding.left + chartWidth / 2}" y="${height - 12}" text-anchor="middle" class="axis-label">Repository order (by date)</text>
   <text x="20" y="${padding.top + chartHeight / 2}" transform="rotate(-90 20 ${padding.top + chartHeight / 2})" text-anchor="middle" class="axis-label">Cumulative bytes${showPercent ? ' (%)' : ''}</text>
 
   ${series.map((s, index) => {
