@@ -82,7 +82,13 @@ function formatDateLabel(value: number, rangeMs: number) {
   const date = new Date(value);
   const year = date.getFullYear();
   const month = `${date.getMonth() + 1}`.padStart(2, '0');
-  return `${month}/${year}`;
+  const day = `${date.getDate()}`.padStart(2, '0');
+  return `${month}/${day}`;
+}
+
+function startOfDayUtc(value: number) {
+  const date = new Date(value);
+  return Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate());
 }
 
 function getPathLength(points: Point[]) {
@@ -210,8 +216,10 @@ export default async function handler(
     const repoDates = filteredRepos.map((repo) =>
       new Date(repo.createdAt).getTime()
     );
-    const minDate = Math.min(...repoDates);
-    const maxDate = Math.max(...repoDates);
+    const minDateRaw = Math.min(...repoDates);
+    const maxDateRaw = Math.max(...repoDates);
+    const minDate = startOfDayUtc(minDateRaw);
+    const maxDate = startOfDayUtc(maxDateRaw);
     const dateRange = Math.max(1, maxDate - minDate);
 
     filteredRepos.forEach((repo, index) => {
@@ -355,11 +363,11 @@ export default async function handler(
       };
     });
 
-    const xTickCount = 6;
-    const xTicks = Array.from({ length: xTickCount }, (_, i) => {
-      if (xTickCount === 1) return minDate;
-      return minDate + (dateRange / (xTickCount - 1)) * i;
-    });
+    const dayMs = 1000 * 60 * 60 * 24;
+    const xTicks: number[] = [];
+    for (let t = minDate; t <= maxDate; t += dayMs) {
+      xTicks.push(t);
+    }
 
     const totalDur = 8;
 
