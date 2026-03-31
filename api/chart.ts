@@ -227,6 +227,12 @@ export default async function handler(
       finalTotals.set(row.Language, row.Bytes);
     }
 
+    let grandTotal = 0;
+    for (const value of finalTotals.values()) {
+      grandTotal += value;
+    }
+    grandTotal = Math.max(1, grandTotal);
+
     const selectedLanguages = [...allLanguages]
       .filter((language) => (finalTotals.get(language) || 0) > 0)
       .sort((a, b) => (finalTotals.get(b) || 0) - (finalTotals.get(a) || 0))
@@ -261,9 +267,8 @@ export default async function handler(
     const series: Series[] = selectedLanguages.map((lang, index) => {
       const rows = rawData.filter((r) => r.Language === lang);
 
-      const langFinal = finalTotals.get(lang) || 1;
       const points = rows.map((r) => {
-        const value = usePercent ? (r.Bytes / langFinal) * 100 : r.Bytes;
+        const value = usePercent ? (r.Bytes / grandTotal) * 100 : r.Bytes;
         return {
           x: scaleX(r.RepoIndex),
           y: scaleY(value),
@@ -352,7 +357,7 @@ export default async function handler(
   <rect class="bg" x="0" y="0" width="${width}" height="${height}" rx="0" />
 
   <text x="${padding.left}" y="34" class="title">${escapeXml(username)} · GitHub Languages</text>
-  <text x="${padding.left}" y="54" class="subtitle">Cumulative ${usePercent ? 'progress' : 'bytes'} by repository creation order</text>
+  <text x="${padding.left}" y="54" class="subtitle">Cumulative ${usePercent ? 'share of total bytes' : 'bytes'} by repository creation order</text>
 
   ${yTicks.map((tick) => `
     <line x1="${padding.left}" y1="${tick.y}" x2="${padding.left + chartWidth}" y2="${tick.y}" class="grid-line" />
@@ -367,7 +372,7 @@ export default async function handler(
   `).join('')}
 
   <text x="${padding.left + chartWidth / 2}" y="${height - 12}" text-anchor="middle" class="axis-label">Repository order</text>
-  <text x="20" y="${padding.top + chartHeight / 2}" transform="rotate(-90 20 ${padding.top + chartHeight / 2})" text-anchor="middle" class="axis-label">Cumulative ${usePercent ? 'progress' : 'bytes'}</text>
+  <text x="20" y="${padding.top + chartHeight / 2}" transform="rotate(-90 20 ${padding.top + chartHeight / 2})" text-anchor="middle" class="axis-label">Cumulative ${usePercent ? 'share of total bytes' : 'bytes'}</text>
 
   ${series.map((s, index) => {
     const finalPoint = s.points[s.points.length - 1];
