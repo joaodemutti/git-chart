@@ -369,8 +369,12 @@ export default async function handler(
 
   ${series.map((s, index) => {
     const finalPoint = s.points[s.points.length - 1];
-    const begin = `${(index * 0.18).toFixed(2)}s`;
-    const dur = `${Math.max(3.2, totalDur - index * 0.18).toFixed(2)}s`;
+    const beginSeconds = index * 0.18;
+    const durSeconds = Math.max(3.2, totalDur - index * 0.18);
+    const endSeconds = beginSeconds + durSeconds;
+    const begin = `${beginSeconds.toFixed(2)}s`;
+    const dur = `${durSeconds.toFixed(2)}s`;
+    const end = `${endSeconds.toFixed(2)}s`;
 
     return `
       <path
@@ -395,10 +399,17 @@ export default async function handler(
         <animateMotion begin="${begin}" dur="${dur}" fill="freeze" path="${s.path}" />
       </circle>
 
+      <text fill="${s.color}" font-size="12" font-weight="600" opacity="0">
+        ${escapeXml(s.name)}
+        <animate attributeName="opacity" from="0" to="1" begin="${begin}" dur="0.25s" fill="freeze" />
+        <animate attributeName="opacity" from="1" to="0" begin="${end}" dur="0.01s" fill="freeze" />
+        <animateMotion begin="${begin}" dur="${dur}" fill="freeze" path="${s.path}" />
+      </text>
+
       <g opacity="0">
-        <animate attributeName="opacity" from="0" to="1" begin="${(index * 0.18 + 0.9).toFixed(2)}s" dur="0.35s" fill="freeze" />
+        <animate attributeName="opacity" from="0" to="1" begin="${end}" dur="0.35s" fill="freeze" />
         <text x="${finalPoint.x + 10}" y="${finalPoint.y + 4}" class="end-label" fill="${s.color}">
-          ${escapeXml(s.name)}: ${formatBytes(s.finalValue)}${showPercent ? ` (${formatPercent((s.finalValue / grandTotal) * 100)})` : ''}
+          ${formatBytes(s.finalValue)}${showPercent ? ` (${formatPercent((s.finalValue / grandTotal) * 100)})` : ''}
         </text>
       </g>
     `;
