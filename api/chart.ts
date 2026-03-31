@@ -82,10 +82,7 @@ function formatDateLabel(value: number, rangeMs: number) {
   const date = new Date(value);
   const year = date.getFullYear();
   const month = `${date.getMonth() + 1}`.padStart(2, '0');
-  if (rangeMs > 1000 * 60 * 60 * 24 * 365 * 2) {
-    return `${year}`;
-  }
-  return `${year}-${month}`;
+  return `${month}/${year}`;
 }
 
 function getPathLength(points: Point[]) {
