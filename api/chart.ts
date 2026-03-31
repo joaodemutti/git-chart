@@ -82,8 +82,7 @@ function formatDateLabel(value: number, rangeMs: number) {
   const date = new Date(value);
   const year = date.getFullYear();
   const month = `${date.getMonth() + 1}`.padStart(2, '0');
-  const day = `${date.getDate()}`.padStart(2, '0');
-  return `${month}/${day}`;
+  return `${month}/${year}`;
 }
 
 function startOfDayUtc(value: number) {
