@@ -242,7 +242,7 @@ export default async function handler(
       top: 72,
       right: 220,
       bottom: 56,
-      left: 72
+      left: showPercent ? 118 : 72
     };
 
     const chartWidth = width - padding.left - padding.right;
