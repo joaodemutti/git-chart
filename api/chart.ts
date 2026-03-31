@@ -409,13 +409,14 @@ export default async function handler(
       <text fill="${s.color}" font-size="12" font-weight="600" opacity="0">
         ${escapeXml(s.name)}
         <animate attributeName="opacity" from="0" to="1" begin="${begin}" dur="0.25s" fill="freeze" />
+        <animate attributeName="opacity" from="1" to="0" begin="${end}" dur="0.01s" fill="freeze" />
         <animateMotion begin="${begin}" dur="${dur}" fill="freeze" path="${s.path}" />
       </text>
 
       <g opacity="0">
         <animate attributeName="opacity" from="0" to="1" begin="${end}" dur="0.35s" fill="freeze" />
         <text x="${finalPoint.x + 10}" y="${finalPoint.y + 4 + finalLabelOffsetY}" class="end-label" fill="${s.color}">
-          ${formatBytes(s.finalValue)}${showPercent ? ` (${formatPercent((s.finalValue / grandTotal) * 100)})` : ''}
+          ${escapeXml(s.name)}: ${formatBytes(s.finalValue)}${showPercent ? ` (${formatPercent((s.finalValue / grandTotal) * 100)})` : ''}
         </text>
       </g>
     `;
