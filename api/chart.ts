@@ -385,6 +385,13 @@ export default async function handler(
     }
 
     const totalDur = 8;
+    const lastIndex = Math.max(0, series.length - 1);
+    const overallEndSeconds =
+      animationDelay +
+      lastIndex * 0.18 +
+      Math.max(3.2, totalDur - lastIndex * 0.18);
+    const raceStartX = scaleX(1);
+    const raceEndX = scaleX(maxX);
     const animationDelay = 0.5;
 
     const svg = `
