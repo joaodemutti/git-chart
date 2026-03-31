@@ -101,7 +101,7 @@ export default async function handler(
     const width = Math.max(700, Number(req.query.width || 1100));
     const height = Math.max(420, Number(req.query.height || 620));
     const mode = String(req.query.mode || 'bytes').toLowerCase();
-    const usePercent = mode === 'percent';
+    const showPercent = mode === 'percent';
 
     const token = process.env.GITHUB_TOKEN;
 
@@ -248,18 +248,10 @@ export default async function handler(
     const chartWidth = width - padding.left - padding.right;
     const chartHeight = height - padding.top - padding.bottom;
     const maxX = Math.max(1, filteredRepos.length);
-    const maxPercent = Math.max(
+    const maxY = Math.max(
       1,
-      ...selectedLanguages.map(
-        (lang) => ((finalTotals.get(lang) || 0) / grandTotal) * 100
-      )
+      ...selectedLanguages.map((lang) => finalTotals.get(lang) || 0)
     );
-    const maxY = usePercent
-      ? maxPercent
-      : Math.max(
-          1,
-          ...selectedLanguages.map((lang) => finalTotals.get(lang) || 0)
-        );
 
     const scaleX = (repoIndex: number) => {
       if (maxX <= 1) return padding.left;
@@ -273,15 +265,12 @@ export default async function handler(
     const series: Series[] = selectedLanguages.map((lang, index) => {
       const rows = rawData.filter((r) => r.Language === lang);
 
-      const points = rows.map((r) => {
-        const value = usePercent ? (r.Bytes / grandTotal) * 100 : r.Bytes;
-        return {
-          x: scaleX(r.RepoIndex),
-          y: scaleY(value),
-          repoIndex: r.RepoIndex,
-          value
-        };
-      });
+      const points = rows.map((r) => ({
+        x: scaleX(r.RepoIndex),
+        y: scaleY(r.Bytes),
+        repoIndex: r.RepoIndex,
+        value: r.Bytes
+      }));
 
       const path = points
         .map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x.toFixed(2)} ${p.y.toFixed(2)}`)
@@ -291,9 +280,7 @@ export default async function handler(
         name: lang,
         color: COLORS[index % COLORS.length],
         points,
-        finalValue: usePercent
-          ? points[points.length - 1]?.value || 0
-          : finalTotals.get(lang) || 0,
+        finalValue: finalTotals.get(lang) || 0,
         path,
         pathLength: getPathLength(points)
       };
@@ -363,11 +350,11 @@ export default async function handler(
   <rect class="bg" x="0" y="0" width="${width}" height="${height}" rx="0" />
 
   <text x="${padding.left}" y="34" class="title">${escapeXml(username)} · GitHub Languages</text>
-  <text x="${padding.left}" y="54" class="subtitle">Cumulative ${usePercent ? 'share of total bytes' : 'bytes'} by repository creation order</text>
+  <text x="${padding.left}" y="54" class="subtitle">Cumulative bytes by repository creation order</text>
 
   ${yTicks.map((tick) => `
     <line x1="${padding.left}" y1="${tick.y}" x2="${padding.left + chartWidth}" y2="${tick.y}" class="grid-line" />
-    <text x="${padding.left - 10}" y="${tick.y + 4}" text-anchor="end" class="axis-label">${usePercent ? formatPercent(tick.value) : formatBytes(tick.value)}</text>
+    <text x="${padding.left - 10}" y="${tick.y + 4}" text-anchor="end" class="axis-label">${formatBytes(tick.value)}</text>
   `).join('')}
 
   <line x1="${padding.left}" y1="${padding.top}" x2="${padding.left}" y2="${padding.top + chartHeight}" class="axis-line" />
@@ -378,7 +365,7 @@ export default async function handler(
   `).join('')}
 
   <text x="${padding.left + chartWidth / 2}" y="${height - 12}" text-anchor="middle" class="axis-label">Repository order</text>
-  <text x="20" y="${padding.top + chartHeight / 2}" transform="rotate(-90 20 ${padding.top + chartHeight / 2})" text-anchor="middle" class="axis-label">Cumulative ${usePercent ? 'share of total bytes' : 'bytes'}</text>
+  <text x="20" y="${padding.top + chartHeight / 2}" transform="rotate(-90 20 ${padding.top + chartHeight / 2})" text-anchor="middle" class="axis-label">Cumulative bytes</text>
 
   ${series.map((s, index) => {
     const finalPoint = s.points[s.points.length - 1];
@@ -411,7 +398,7 @@ export default async function handler(
       <g opacity="0">
         <animate attributeName="opacity" from="0" to="1" begin="${(index * 0.18 + 0.9).toFixed(2)}s" dur="0.35s" fill="freeze" />
         <text x="${finalPoint.x + 10}" y="${finalPoint.y + 4}" class="end-label" fill="${s.color}">
-          ${escapeXml(s.name)}: ${usePercent ? formatPercent(s.finalValue) : formatBytes(s.finalValue)}
+          ${escapeXml(s.name)}: ${formatBytes(s.finalValue)}${showPercent ? ` (${formatPercent((s.finalValue / grandTotal) * 100)})` : ''}
         </text>
       </g>
     `;
