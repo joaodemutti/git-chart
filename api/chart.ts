@@ -248,8 +248,14 @@ export default async function handler(
     const chartWidth = width - padding.left - padding.right;
     const chartHeight = height - padding.top - padding.bottom;
     const maxX = Math.max(1, filteredRepos.length);
+    const maxPercent = Math.max(
+      1,
+      ...selectedLanguages.map(
+        (lang) => ((finalTotals.get(lang) || 0) / grandTotal) * 100
+      )
+    );
     const maxY = usePercent
-      ? 100
+      ? maxPercent
       : Math.max(
           1,
           ...selectedLanguages.map((lang) => finalTotals.get(lang) || 0)
