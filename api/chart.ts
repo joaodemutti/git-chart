@@ -78,6 +78,16 @@ function formatPercent(value: number) {
   return `${value.toFixed(1)}%`;
 }
 
+function formatDateLabel(value: number, rangeMs: number) {
+  const date = new Date(value);
+  const year = date.getFullYear();
+  const month = `${date.getMonth() + 1}`.padStart(2, '0');
+  if (rangeMs > 1000 * 60 * 60 * 24 * 365 * 2) {
+    return `${year}`;
+  }
+  return `${year}-${month}`;
+}
+
 function getPathLength(points: Point[]) {
   let total = 0;
 
@@ -195,11 +205,20 @@ export default async function handler(
     const rawData: Array<{
       RepoIndex: number;
       RepoName: string;
+      RepoDate: number;
       Language: string;
       Bytes: number;
     }> = [];
 
+    const repoDates = filteredRepos.map((repo) =>
+      new Date(repo.createdAt).getTime()
+    );
+    const minDate = Math.min(...repoDates);
+    const maxDate = Math.max(...repoDates);
+    const dateRange = Math.max(1, maxDate - minDate);
+
     filteredRepos.forEach((repo, index) => {
+      const repoDate = new Date(repo.createdAt).getTime();
       const repoLangMap = new Map<string, number>();
 
       for (const edge of repo.languages.edges) {
@@ -216,6 +235,7 @@ export default async function handler(
         rawData.push({
           RepoIndex: index + 1,
           RepoName: repo.name,
+          RepoDate: repoDate,
           Language: language,
           Bytes: next
         });
@@ -258,9 +278,9 @@ export default async function handler(
       maxY = (grandTotal * roundedPercent) / 100;
     }
 
-    const scaleX = (repoIndex: number) => {
-      if (maxX <= 1) return padding.left;
-      return padding.left + ((repoIndex - 1) / (maxX - 1)) * chartWidth;
+    const scaleX = (repoDate: number) => {
+      if (minDate === maxDate) return padding.left;
+      return padding.left + ((repoDate - minDate) / dateRange) * chartWidth;
     };
 
     const scaleY = (value: number) => {
@@ -271,7 +291,7 @@ export default async function handler(
       const rows = rawData.filter((r) => r.Language === lang);
 
       const points = rows.map((r) => ({
-        x: scaleX(r.RepoIndex),
+        x: scaleX(r.RepoDate),
         y: scaleY(r.Bytes),
         repoIndex: r.RepoIndex,
         value: r.Bytes
@@ -338,10 +358,11 @@ export default async function handler(
       };
     });
 
-    const xLabelEvery = Math.max(1, Math.ceil(maxX / 8));
-    const xTicks = Array.from({ length: maxX }, (_, i) => i + 1).filter(
-      (value) => value === 1 || value === maxX || value % xLabelEvery === 0
-    );
+    const xTickCount = 6;
+    const xTicks = Array.from({ length: xTickCount }, (_, i) => {
+      if (xTickCount === 1) return minDate;
+      return minDate + (dateRange / (xTickCount - 1)) * i;
+    });
 
     const totalDur = 8;
 
@@ -404,10 +425,10 @@ export default async function handler(
   <line x1="${padding.left}" y1="${padding.top + chartHeight}" x2="${padding.left + chartWidth}" y2="${padding.top + chartHeight}" class="axis-line" />
 
   ${xTicks.map((tick) => `
-    <text x="${scaleX(tick)}" y="${padding.top + chartHeight + 22}" text-anchor="middle" class="axis-label">${tick}</text>
+    <text x="${scaleX(tick)}" y="${padding.top + chartHeight + 22}" text-anchor="middle" class="axis-label">${formatDateLabel(tick, dateRange)}</text>
   `).join('')}
 
-  <text x="${padding.left + chartWidth / 2}" y="${height - 12}" text-anchor="middle" class="axis-label">Repository order</text>
+  <text x="${padding.left + chartWidth / 2}" y="${height - 12}" text-anchor="middle" class="axis-label">Repository date</text>
   <text x="20" y="${padding.top + chartHeight / 2}" transform="rotate(-90 20 ${padding.top + chartHeight / 2})" text-anchor="middle" class="axis-label">Cumulative bytes${showPercent ? ' (%)' : ''}</text>
 
   ${series.map((s, index) => {
