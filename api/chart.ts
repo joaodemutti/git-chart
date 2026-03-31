@@ -385,6 +385,7 @@ export default async function handler(
     }
 
     const totalDur = 8;
+    const animationDelay = 0.5;
 
     const svg = `
 <svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" role="img" aria-label="${escapeXml(username)} GitHub languages line race">
@@ -453,7 +454,7 @@ export default async function handler(
 
   ${series.map((s, index) => {
     const finalPoint = s.points[s.points.length - 1];
-    const beginSeconds = index * 0.18;
+    const beginSeconds = animationDelay + index * 0.18;
     const durSeconds = Math.max(3.2, totalDur - index * 0.18);
     const endSeconds = beginSeconds + durSeconds;
     const begin = `${beginSeconds.toFixed(2)}s`;
