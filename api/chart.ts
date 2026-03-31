@@ -413,13 +413,13 @@ export default async function handler(
 
   ${series.map((s, index) => {
     const finalPoint = s.points[s.points.length - 1];
-    const finalLabelOffsetY = 16 * index;
     const beginSeconds = index * 0.18;
     const durSeconds = Math.max(3.2, totalDur - index * 0.18);
     const endSeconds = beginSeconds + durSeconds;
     const begin = `${beginSeconds.toFixed(2)}s`;
     const dur = `${durSeconds.toFixed(2)}s`;
     const end = `${endSeconds.toFixed(2)}s`;
+    const labelY = labelPositions[index] ?? finalPoint.y + 4;
 
     return `
       <path
@@ -453,7 +453,8 @@ export default async function handler(
 
       <g opacity="0">
         <animate attributeName="opacity" from="0" to="1" begin="${end}" dur="0.35s" fill="freeze" />
-        <text x="${finalPoint.x + 10}" y="${finalPoint.y + 4 + finalLabelOffsetY}" class="end-label" fill="${s.color}">
+        <line x1="${finalPoint.x + 4}" y1="${finalPoint.y}" x2="${labelX - 6}" y2="${labelY - 2}" stroke="${s.color}" stroke-width="1" opacity="0.45" />
+        <text x="${labelX}" y="${labelY}" class="end-label" fill="${s.color}">
           ${escapeXml(s.name)}: ${formatBytes(s.finalValue)}${showPercent ? ` (${formatPercent((s.finalValue / grandTotal) * 100)})` : ''}
         </text>
       </g>
