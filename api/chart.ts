@@ -392,24 +392,18 @@ export default async function handler(
 
   ${yTicks.map((tick) => `
     <line x1="${padding.left}" y1="${tick.y}" x2="${padding.left + chartWidth}" y2="${tick.y}" class="grid-line" />
-    <text x="${padding.left - 10}" y="${tick.y + 4}" text-anchor="end" class="axis-label">${formatBytes(tick.value)}</text>
+    <text x="${padding.left - 10}" y="${tick.y + 4}" text-anchor="end" class="axis-label">${formatBytes(tick.value)}${showPercent ? ` (${formatPercent((tick.value / grandTotal) * 100)})` : ''}</text>
   `).join('')}
 
   <line x1="${padding.left}" y1="${padding.top}" x2="${padding.left}" y2="${padding.top + chartHeight}" class="axis-line" />
   <line x1="${padding.left}" y1="${padding.top + chartHeight}" x2="${padding.left + chartWidth}" y2="${padding.top + chartHeight}" class="axis-line" />
-  ${showPercent ? `<line x1="${padding.left + chartWidth}" y1="${padding.top}" x2="${padding.left + chartWidth}" y2="${padding.top + chartHeight}" class="axis-line" />` : ''}
 
   ${xTicks.map((tick) => `
     <text x="${scaleX(tick)}" y="${padding.top + chartHeight + 22}" text-anchor="middle" class="axis-label">${tick}</text>
   `).join('')}
 
-  ${showPercent ? yTicks.map((tick) => `
-    <text x="${padding.left + chartWidth + 10}" y="${tick.y + 4}" text-anchor="start" class="axis-label">${formatPercent((tick.value / grandTotal) * 100)}</text>
-  `).join('') : ''}
-
   <text x="${padding.left + chartWidth / 2}" y="${height - 12}" text-anchor="middle" class="axis-label">Repository order</text>
-  <text x="20" y="${padding.top + chartHeight / 2}" transform="rotate(-90 20 ${padding.top + chartHeight / 2})" text-anchor="middle" class="axis-label">Cumulative bytes</text>
-  ${showPercent ? `<text x="${width - 20}" y="${padding.top + chartHeight / 2}" transform="rotate(-90 ${width - 20} ${padding.top + chartHeight / 2})" text-anchor="middle" class="axis-label">Cumulative % of total</text>` : ''}
+  <text x="20" y="${padding.top + chartHeight / 2}" transform="rotate(-90 20 ${padding.top + chartHeight / 2})" text-anchor="middle" class="axis-label">Cumulative bytes${showPercent ? ' (%)' : ''}</text>
 
   ${series.map((s, index) => {
     const finalPoint = s.points[s.points.length - 1];
