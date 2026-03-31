@@ -248,10 +248,15 @@ export default async function handler(
     const chartWidth = width - padding.left - padding.right;
     const chartHeight = height - padding.top - padding.bottom;
     const maxX = Math.max(1, filteredRepos.length);
-    const maxY = Math.max(
+    let maxY = Math.max(
       1,
       ...selectedLanguages.map((lang) => finalTotals.get(lang) || 0)
     );
+    if (showPercent) {
+      const maxPercent = (maxY / grandTotal) * 100;
+      const roundedPercent = Math.max(5, Math.ceil(maxPercent / 5) * 5);
+      maxY = (grandTotal * roundedPercent) / 100;
+    }
 
     const scaleX = (repoIndex: number) => {
       if (maxX <= 1) return padding.left;
