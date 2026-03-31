@@ -147,8 +147,7 @@ export default async function handler(
     const top = Math.max(1, Math.min(12, Number(req.query.top || 8)));
     const width = Math.max(700, Number(req.query.width || 1100));
     const height = Math.max(420, Number(req.query.height || 620));
-    const mode = String(req.query.mode || 'bytes').toLowerCase();
-    const showPercent = mode === 'percent';
+    const showPercent = true;
 
     const token = process.env.GITHUB_TOKEN;
 
@@ -301,7 +300,7 @@ export default async function handler(
       top: 72,
       right: 220,
       bottom: 56,
-      left: showPercent ? 118 : 72
+      left: 118
     };
 
     const chartWidth = width - padding.left - padding.right;
