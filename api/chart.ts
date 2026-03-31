@@ -376,6 +376,13 @@ export default async function handler(
     if (!xTicks.includes(maxX)) {
       xTicks.push(maxX);
     }
+    if (xTicks.length >= 2) {
+      const last = xTicks[xTicks.length - 1];
+      const prev = xTicks[xTicks.length - 2];
+      if (scaleX(last) - scaleX(prev) < minLabelSpacing) {
+        xTicks.splice(xTicks.length - 2, 1);
+      }
+    }
 
     const totalDur = 8;
 
