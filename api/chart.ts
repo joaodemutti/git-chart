@@ -227,14 +227,6 @@ export default async function handler(
       finalTotals.set(row.Language, row.Bytes);
     }
 
-    const totalsByRepo = new Map<number, number>();
-    for (const row of rawData) {
-      totalsByRepo.set(
-        row.RepoIndex,
-        (totalsByRepo.get(row.RepoIndex) || 0) + row.Bytes
-      );
-    }
-
     const selectedLanguages = [...allLanguages]
       .filter((language) => (finalTotals.get(language) || 0) > 0)
       .sort((a, b) => (finalTotals.get(b) || 0) - (finalTotals.get(a) || 0))
@@ -269,18 +261,16 @@ export default async function handler(
     const series: Series[] = selectedLanguages.map((lang, index) => {
       const rows = rawData.filter((r) => r.Language === lang);
 
-      const points = rows.map((r) => ({
-        x: scaleX(r.RepoIndex),
-        y: scaleY(
-          usePercent
-            ? ((r.Bytes || 0) / (totalsByRepo.get(r.RepoIndex) || 1)) * 100
-            : r.Bytes
-        ),
-        repoIndex: r.RepoIndex,
-        value: usePercent
-          ? ((r.Bytes || 0) / (totalsByRepo.get(r.RepoIndex) || 1)) * 100
-          : r.Bytes
-      }));
+      const langFinal = finalTotals.get(lang) || 1;
+      const points = rows.map((r) => {
+        const value = usePercent ? (r.Bytes / langFinal) * 100 : r.Bytes;
+        return {
+          x: scaleX(r.RepoIndex),
+          y: scaleY(value),
+          repoIndex: r.RepoIndex,
+          value
+        };
+      });
 
       const path = points
         .map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x.toFixed(2)} ${p.y.toFixed(2)}`)
@@ -362,7 +352,7 @@ export default async function handler(
   <rect class="bg" x="0" y="0" width="${width}" height="${height}" rx="0" />
 
   <text x="${padding.left}" y="34" class="title">${escapeXml(username)} · GitHub Languages</text>
-  <text x="${padding.left}" y="54" class="subtitle">Cumulative ${usePercent ? 'share' : 'bytes'} by repository creation order</text>
+  <text x="${padding.left}" y="54" class="subtitle">Cumulative ${usePercent ? 'progress' : 'bytes'} by repository creation order</text>
 
   ${yTicks.map((tick) => `
     <line x1="${padding.left}" y1="${tick.y}" x2="${padding.left + chartWidth}" y2="${tick.y}" class="grid-line" />
@@ -377,7 +367,7 @@ export default async function handler(
   `).join('')}
 
   <text x="${padding.left + chartWidth / 2}" y="${height - 12}" text-anchor="middle" class="axis-label">Repository order</text>
-  <text x="20" y="${padding.top + chartHeight / 2}" transform="rotate(-90 20 ${padding.top + chartHeight / 2})" text-anchor="middle" class="axis-label">Cumulative ${usePercent ? 'share' : 'bytes'}</text>
+  <text x="20" y="${padding.top + chartHeight / 2}" transform="rotate(-90 20 ${padding.top + chartHeight / 2})" text-anchor="middle" class="axis-label">Cumulative ${usePercent ? 'progress' : 'bytes'}</text>
 
   ${series.map((s, index) => {
     const finalPoint = s.points[s.points.length - 1];
