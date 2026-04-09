@@ -144,6 +144,13 @@ export default async function handler(
   try {
     const username = String(req.query.username || 'joaodemutti');
     const includeForks = String(req.query.forks || 'false') === 'true';
+    const excludeParam = String(req.query.exclude || '');
+    const excludeRepos = new Set(
+      excludeParam
+        .split(',')
+        .map((name) => name.trim().toLowerCase())
+        .filter(Boolean)
+    );
     const top = Math.max(1, Math.min(12, Number(req.query.top || 8)));
     const width = Math.max(700, Number(req.query.width || 1100));
     const height = Math.max(420, Number(req.query.height || 620));
@@ -217,10 +224,12 @@ export default async function handler(
     }
 
     const repos = payload.data?.user?.repositories.nodes ?? [];
-    const filteredRepos = includeForks ? repos : repos.filter((r) => !r.isFork);
+    const filteredRepos = (includeForks ? repos : repos.filter((r) => !r.isFork)).filter(
+      (repo) => !excludeRepos.has(repo.name.toLowerCase())
+    );
 
     if (filteredRepos.length === 0) {
-      res.status(404).send('No repositories found');
+      res.status(404).send('No repositories found after filters');
       return;
     }
 
