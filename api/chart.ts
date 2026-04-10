@@ -47,6 +47,8 @@ type Series = {
   dashValues: string;
 };
 
+type Mode = 'commit' | 'branch';
+
 const COLORS = [
   '#58a6ff',
   '#3fb950',
@@ -155,6 +157,17 @@ export default async function handler(
     const width = Math.max(700, Number(req.query.width || 1100));
     const height = Math.max(420, Number(req.query.height || 620));
     const showPercent = true;
+
+    const modeRaw = String(req.query.mode || 'commit').toLowerCase();
+    if (modeRaw !== 'commit' && modeRaw !== 'branch') {
+      res.status(400).json({
+        error: 'Invalid mode. Use "commit" or "branch".'
+      });
+      return;
+    }
+
+    const mode = modeRaw as Mode;
+    const isCommitMode = mode === 'commit';
 
     const token = process.env.GITHUB_TOKEN;
 
@@ -274,17 +287,19 @@ export default async function handler(
 
       for (const language of allLanguages) {
         const current = cumulative.get(language) || 0;
-        const added = repoLangMap.get(language) || 0;
-        const next = current + added;
+        const repoValue = repoLangMap.get(language) || 0;
+        const value = isCommitMode ? current + repoValue : repoValue;
 
-        cumulative.set(language, next);
+        if (isCommitMode) {
+          cumulative.set(language, value);
+        }
 
         rawData.push({
           RepoIndex: index + 1,
           RepoName: repo.name,
           RepoDate: repoDate,
           Language: language,
-          Bytes: next
+          Bytes: value
         });
       }
     });
@@ -466,7 +481,11 @@ export default async function handler(
   <rect class="bg" x="0" y="0" width="${width}" height="${height}" rx="0" />
 
   <text x="${padding.left}" y="34" class="title">${escapeXml(username)} · GitHub Languages</text>
-  <text x="${padding.left}" y="54" class="subtitle">Cumulative bytes by repository creation order</text>
+  <text x="${padding.left}" y="54" class="subtitle">${
+    isCommitMode
+      ? 'Cumulative bytes by repository creation order'
+      : 'Current language bytes by repository'
+  }</text>
 
   ${yTicks.map((tick) => `
     <line x1="${padding.left}" y1="${tick.y}" x2="${padding.left + chartWidth}" y2="${tick.y}" class="grid-line" />
@@ -481,19 +500,21 @@ export default async function handler(
   `).join('')}
 
   <text x="${padding.left + chartWidth / 2}" y="${height - 12}" text-anchor="middle" class="axis-label">Repository order (by date)</text>
-  <text x="20" y="${padding.top + chartHeight / 2}" transform="rotate(-90 20 ${padding.top + chartHeight / 2})" text-anchor="middle" class="axis-label">Cumulative bytes${showPercent ? ' (%)' : ''}</text>
+  <text x="20" y="${padding.top + chartHeight / 2}" transform="rotate(-90 20 ${padding.top + chartHeight / 2})" text-anchor="middle" class="axis-label">${
+    isCommitMode ? 'Cumulative bytes' : 'Language bytes'
+  }${showPercent ? ' (%)' : ''}</text>
 
   ${series.map((s, index) => {
     const finalPoint = s.points[s.points.length - 1];
     const beginSeconds = animationDelay;
     const durSeconds = totalDur;
     const endSeconds = beginSeconds + durSeconds;
-      const begin = `${beginSeconds.toFixed(2)}s`;
-      const dur = `${durSeconds.toFixed(2)}s`;
-      const end = `${endSeconds.toFixed(2)}s`;
-      const labelY = labelPositions[index] ?? finalPoint.y + 4;
+    const begin = `${beginSeconds.toFixed(2)}s`;
+    const dur = `${durSeconds.toFixed(2)}s`;
+    const end = `${endSeconds.toFixed(2)}s`;
+    const labelY = labelPositions[index] ?? finalPoint.y + 4;
 
-      return `
+    return `
       <path
         d="${s.path}"
         class="line"
@@ -532,7 +553,7 @@ export default async function handler(
         </text>
       </g>
     `;
-    }).join('')}
+  }).join('')}
 </svg>`.trim();
 
     res.setHeader('Content-Type', 'image/svg+xml; charset=utf-8');
